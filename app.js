@@ -6,6 +6,22 @@ var firstCall = true;
 var tokenAddr = null;
 var tokens = null;
 var tokenIndex = -1;
+var writeDirectory = null;
+
+function createDirectories() {
+  var rootDir = "../crypto-arb2"
+  var dir1 = `${rootDir}/exchange_data`;
+  var dir2 = `${dir1}/etherdelta`;
+  if (!fs.existsSync(dir1)) {
+    fs.mkdirSync(dir1);
+  }
+  if (!fs.existsSync(dir2)) {
+    fs.mkdirSync(dir2);
+  }
+  writeDirectory = dir2;
+}
+createDirectories();
+
 socket.on('connect', () => {
   console.log('socket connected');
 });
@@ -28,32 +44,37 @@ function formatSymbol(symbol) {
 }
 
 function writeToFile(symbol, data) {
-  if (!fs.existsSync('./exchange_data')) {
-    fs.mkdirSync('./exchange_data');
-  }
-  if (!fs.existsSync('./exchange_data/etherdelta')) {
-    fs.mkdirSync('./exchange_data/etherdelta');
-  }
-  fs.writeFileSync(`./exchange_data/etherdelta/${symbol}.json`, JSON.stringify(data));
+  console.log(`writing to ${writeDirectory}/${symbol}.json`);
+  fs.writeFileSync(`${writeDirectory}/${symbol}.json`, JSON.stringify(data));
 }
 
 socket.on('market', (data) => {
   if (!data["returnTicker"]) {
     return;
   }
-  if (data["orders"] && data["orders"]["buys"].length == 0) {
-    tokens = [];
-    markets = data["returnTicker"]
-    for (var key in markets) {
-      tokens.push( [ key, markets[key]["tokenAddr"] ] );
+  if (data["orders"]) {
+    if (data["orders"]["buys"].length == 0) {
+      console.log("first call complete, setting tokens");
+      tokens = [];
+      markets = data["returnTicker"]
+      for (var key in markets) {
+        if (key.startsWith("0x")) {
+          continue;
+        }
+        tokens.push( [ key, markets[key]["tokenAddr"] ] );
+      }
+      console.log(`tokens: ${tokens}`);
     }
-    console.log(`tokens: ${tokens}`);
-  }
-  else {
-    var tokenAddr = data["orders"]["buys"][0]["tokenGet"];
-    symbol = findSymbolFromTokenAddr(tokenAddr, data["returnTicker"]);
-    symbol = formatSymbol(symbol);
-    writeToFile(symbol, data);
+    else {
+      var tokenAddr = data["orders"]["buys"][0]["tokenGet"];
+      symbol = findSymbolFromTokenAddr(tokenAddr, data["returnTicker"]);
+      if (!symbol) { 
+        console.log(`no symbol for ${tokenAddr}`);
+        return; 
+      }
+      symbol = formatSymbol(symbol);
+      writeToFile(symbol, data);
+    }
   }
 });
 
@@ -78,7 +99,12 @@ socket.on('market', (data) => {
 
 (async function main() {
   if( tokens ) {
+    console.log(`${tokens.length} tokens, \n` + tokens.toString());
     tokenIndex++;
+    if (tokenIndex >= tokens.length) {
+      tokenIndex = 0;
+    }
+    console.log(`requesting #${tokenIndex} of ${tokens.length}, ${tokens[tokenIndex][0]}`);
     tokenAddr = tokens[tokenIndex][1];
   }
   console.log(`emitting getmarket with tokenAddr ${tokenAddr}`)
