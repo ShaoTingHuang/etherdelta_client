@@ -58,7 +58,8 @@ socket.on('market', (data) => {
       tokens = [];
       markets = data["returnTicker"]
       for (var key in markets) {
-        if (key.startsWith("0x")) {
+        keySplit = key.split("_")
+        if (keySplit[keySplit.length-1].startsWith("0x")) {
           continue;
         }
         tokens.push( [ key, markets[key]["tokenAddr"] ] );
@@ -104,9 +105,21 @@ socket.on('market', (data) => {
     if (tokenIndex >= tokens.length) {
       tokenIndex = 0;
     }
+
+    // find a specific symbol
+    // for(var i=0; i<tokens.length; i++) {
+    //   if( tokens[i][0] == "ETH_OMG" ){
+
+    //     console.log('found OMG')
+    //     tokenIndex = i;
+    //     break;
+    //   }
+    // }
+
     console.log(`requesting #${tokenIndex} of ${tokens.length}, ${tokens[tokenIndex][0]}`);
     tokenAddr = tokens[tokenIndex][1];
   }
+
   console.log(`emitting getmarket with tokenAddr ${tokenAddr}`)
   socket.emit("getMarket", { token: tokenAddr });
     //{token: "0xac3211a5025414af2866ff09c23fc18bc97e79b1" });
